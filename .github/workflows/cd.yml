@@ -1,0 +1,39 @@
+name: CD Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      repo:
+        required: true
+        type: string
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+      SSH_PRIVATE_KEY:
+        required: true
+      SERVER_HOST:
+        required: true
+      SERVER_USER:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout target repo
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ inputs.repo }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy to server
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p ~/app"
+          scp -r ./* ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/app
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "cd ~/app && docker-compose down && docker-compose up -d --build"
