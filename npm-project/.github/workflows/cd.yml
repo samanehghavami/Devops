@@ -1,0 +1,53 @@
+name: CD Deploy
+
+on:
+  workflow_call:
+    inputs:
+      registry:
+        type: string
+        required: true
+      image:
+        type: string
+        required: true
+      tag:
+        type: string
+        required: true
+      repo_url:
+        type: string
+        required: true
+      deploy_branch:
+        type: string
+        default: "gitlab-cd"
+    secrets:
+      REGISTRY_USER:
+        required: true
+      REGISTRY_PASSWORD:
+        required: true
+      TOKEN:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Login to Registry
+        run: |
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | \
+            docker login -u "${{ secrets.REGISTRY_USER }}" --password-stdin "${{ inputs.registry }}"
+
+      - name: Clone deploy branch
+        run: |
+          git init deploy
+          cd deploy
+          git remote add origin "${{ inputs.repo_url }}"
+          git fetch origin "${{ inputs.deploy_branch }}"
+          git checkout origin/${{ inputs.deploy_branch }} -- docker-compose.yml
+
+      - name: Deploy using docker-compose
+        run: |
+          cd deploy
+          export IMAGE_TAG="${{ inputs.registry }}/${{ inputs.image }}:${{ inputs.tag }}"
+          echo "Deploying image: $IMAGE_TAG"
+          docker compose down || true
+          docker compose up -d
