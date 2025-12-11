@@ -1,28 +1,40 @@
-name: CI Pipeline
+name: Build Image
 
 on:
   workflow_call:
     inputs:
-      repo:
-        required: true
+      registry:
         type: string
+        required: true
+      image:
+        type: string
+        required: true
+      tag:
+        type: string
+        required: true
     secrets:
-      TOKEN:
+      REGISTRY_USER:
+        required: true
+      REGISTRY_PASSWORD:
         required: true
 
 jobs:
-  ci-build:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout target repo
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ inputs.repo }}
-          token: ${{ secrets.TOKEN }}
+      - name: Checkout project
+        uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Login to Registry
+        run: |
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | \
+            docker login -u "${{ secrets.REGISTRY_USER }}" --password-stdin "${{ inputs.registry }}"
 
-      - name: Build Docker image
-        run: docker build -t simple-npm-app .
+      - name: Build image
+        run: |
+          echo "Building image: ${{ inputs.registry }}/${{ inputs.image }}:${{ inputs.tag }}"
+          docker build -t ${{ inputs.registry }}/${{ inputs.image }}:${{ inputs.tag }} .
+
+      - name: Push image
+        run: docker push ${{ inputs.registry }}/${{ inputs.image }}:${{ inputs.tag }}
